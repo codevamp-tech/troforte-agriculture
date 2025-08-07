@@ -1,60 +1,58 @@
-import { StyleSheet, Text, type TextProps } from 'react-native';
-
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { useThemeColor } from "@/hooks/useThemeColor"
+import { Platform, StyleSheet, Text, type TextProps } from "react-native"
 
 export type ThemedTextProps = TextProps & {
-  lightColor?: string;
-  darkColor?: string;
-  type?: 'default' | 'title' | 'defaultSemiBold' | 'subtitle' | 'link';
-};
+  lightColor?: string
+  darkColor?: string
+  type?: "default" | "title" | "defaultSemiBold" | "subtitle" | "link"
+}
 
-export function ThemedText({
-  style,
-  lightColor,
-  darkColor,
-  type = 'default',
-  ...rest
-}: ThemedTextProps) {
-  const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
+export function ThemedText({ style, lightColor, darkColor, type = "default", ...rest }: ThemedTextProps) {
+  const color = useThemeColor({ light: lightColor, dark: darkColor }, "text")
 
   return (
     <Text
       style={[
-        { color },
-        type === 'default' ? styles.default : undefined,
-        type === 'title' ? styles.title : undefined,
-        type === 'defaultSemiBold' ? styles.defaultSemiBold : undefined,
-        type === 'subtitle' ? styles.subtitle : undefined,
-        type === 'link' ? styles.link : undefined,
+        { color: "#FFFFFF" },
+        type === "default" ? styles.default : undefined,
+        type === "title" ? styles.title : undefined,
+        type === "defaultSemiBold" ? styles.defaultSemiBold : undefined,
+        type === "subtitle" ? styles.subtitle : undefined,
+        type === "link" ? styles.link : undefined,
         style,
       ]}
       {...rest}
     />
-  );
+  )
 }
 
 const styles = StyleSheet.create({
   default: {
     fontSize: 16,
     lineHeight: 24,
+    fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
   },
   defaultSemiBold: {
     fontSize: 16,
     lineHeight: 24,
-    fontWeight: '600',
+    fontWeight: "600",
+    fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     lineHeight: 32,
+    fontFamily: Platform.OS === "ios" ? "SF Pro Display" : "Roboto",
   },
   subtitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
+    fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
   },
   link: {
     lineHeight: 30,
     fontSize: 16,
-    color: '#0a7ea4',
+    color: "#00D084",
+    fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
   },
-});
+})
