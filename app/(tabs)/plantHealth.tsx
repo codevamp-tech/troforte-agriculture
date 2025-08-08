@@ -1,4 +1,5 @@
 import AnalysisSidebar from "@/components/AnalysisSidebar";
+import ImageZoomModal from "@/components/modal/ImageZoomModal";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import * as ImagePicker from "expo-image-picker";
@@ -40,12 +41,20 @@ interface Analysis {
   };
   diseases: Disease[];
 }
+interface RecommendedProducts {
+  [key: string]: {
+    loading: boolean;
+    response: string | null;
+  };
+}
 
 const API_BASE_URL = "http://192.168.1.17:4000/api";
 
 export default function PlantHealthAnalyzer() {
   const [images, setImages] = useState<any[]>([]);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [recommendedProducts, setRecommendedProducts] =
+    useState<RecommendedProducts>({});
   const [loading, setLoading] = useState(false);
   const [expandedTreatments, setExpandedTreatments] = useState<{
     [key: string]: boolean;
@@ -59,7 +68,9 @@ export default function PlantHealthAnalyzer() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const tabBarHeight = useBottomTabBarHeight();
-  const [isViewingPreviousAnalysis, setIsViewingPreviousAnalysis] = useState(false);
+  const [isViewingPreviousAnalysis, setIsViewingPreviousAnalysis] =
+    useState(false);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   useEffect(() => {
     initializeDeviceId();
@@ -68,10 +79,9 @@ export default function PlantHealthAnalyzer() {
 
   useEffect(() => {
     if (deviceId) {
-      loadAnalysisHistory()
+      loadAnalysisHistory();
     }
-  }, [deviceId])
-
+  }, [deviceId]);
 
   const initializeDeviceId = async () => {
     try {
@@ -130,22 +140,34 @@ export default function PlantHealthAnalyzer() {
       );
       const data = await response.json();
       if (response.ok) {
+        // Handle single string imageUrl
+        const loadedImages = data.imageUrl
+          ? [
+              {
+                uri: data.imageUrl,
+                name: data.imageUrl.split("/").pop() || "plant_image.jpg",
+                type: "image/jpeg",
+              },
+            ]
+          : [];
+
+        setImages(loadedImages);
         setAnalysis({
-        ...data.analysis,
-        diseases: data.analysis.result.disease.suggestions.map((d: any) => ({
-          name: d.name,
-          probability: d.probability,
-          description: d.details?.description,
-          classification: d.details?.classification || [],
-          treatments: {
-            chemical: d.details?.treatment?.chemical || [],
-            biological: d.details?.treatment?.biological || [],
-            prevention: d.details?.treatment?.prevention || [],
-          },
-          similar_images: d.similar_images || [],
-          infoLink: d.details?.url || null,
-        })),
-      });
+          ...data.analysis,
+          diseases: data.analysis.result.disease.suggestions.map((d: any) => ({
+            name: d.name,
+            probability: d.probability,
+            description: d.details?.description,
+            classification: d.details?.classification || [],
+            treatments: {
+              chemical: d.details?.treatment?.chemical || [],
+              biological: d.details?.treatment?.biological || [],
+              prevention: d.details?.treatment?.prevention || [],
+            },
+            similar_images: d.similar_images || [],
+            infoLink: d.details?.url || null,
+          })),
+        });
         setAnalysisId(analysisId);
         await AsyncStorage.setItem("currentAnalysisId", analysisId);
       } else {
@@ -171,41 +193,44 @@ export default function PlantHealthAnalyzer() {
 
   const deleteAnalysis = async (analysisId: string) => {
     if (!deviceId) return;
-    Alert.alert("Delete Analysis", "Are you sure you want to delete this analysis?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const response = await fetch(`${API_BASE_URL}/analysis`, {
-              method: "DELETE",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ analysisId, deviceId }),
-            });
-            if (response.ok) {
-              if (currentAnalysisId === analysisId) {
-                startNewAnalysis();
+    Alert.alert(
+      "Delete Analysis",
+      "Are you sure you want to delete this analysis?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const response = await fetch(`${API_BASE_URL}/analysis`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ analysisId, deviceId }),
+              });
+              if (response.ok) {
+                if (currentAnalysisId === analysisId) {
+                  startNewAnalysis();
+                }
+                loadAnalysisHistory();
+              } else {
+                const data = await response.json();
+                Alert.alert("Error", data.error || "Failed to delete analysis");
               }
-              loadAnalysisHistory();
-            } else {
-              const data = await response.json();
-              Alert.alert("Error", data.error || "Failed to delete analysis");
+            } catch (error) {
+              console.error("Error deleting analysis:", error);
+              Alert.alert("Error", "Failed to delete analysis");
             }
-          } catch (error) {
-            console.error("Error deleting analysis:", error);
-            Alert.alert("Error", "Failed to delete analysis");
-          }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const pickFiles = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
         quality: 1,
       });
       if (!result.canceled) {
@@ -260,6 +285,7 @@ export default function PlantHealthAnalyzer() {
 
       const json = await response.json();
       const responseData = json.data;
+      console.log("responseData", responseData);
       setAnalysis({
         ...responseData,
         diseases: responseData.result.disease.suggestions.map((d: any) => ({
@@ -276,8 +302,7 @@ export default function PlantHealthAnalyzer() {
           infoLink: d.details?.url || null,
         })),
       });
-      
-      // Load history after successful analysis
+
       loadAnalysisHistory();
     } catch (err) {
       console.error(err);
@@ -305,6 +330,66 @@ export default function PlantHealthAnalyzer() {
       [key]: !prev[key],
     }));
   };
+
+  const fetchRecommendedProducts = async (diseaseName: string) => {
+  const diseaseKey = `disease_${diseaseName}`;
+  
+  setRecommendedProducts(prev => ({
+    ...prev,
+    [diseaseKey]: {
+      loading: true,
+      response: null
+    }
+  }));
+
+  try {
+    const response = await fetch('http://192.168.1.17:4000/api/chat?recommend=true', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: `my plant has ${diseaseName}. recommend me products`
+      })
+    });
+
+    const textData = await response.text();
+    const jsonData = JSON.parse(textData);
+    const recommendation = jsonData.recommendation || textData;
+    console.log("recommendation", recommendation)
+
+    // Extract product blocks
+    const productBlocks = recommendation.match(
+      /- \*\*Recommended Product:\*\* (.*?)\s+- \*\*Why It Works:\*\* (.*?)\s+- \*\*Application Advice:\*\* (.*?)(?=\n\n###|\n\n$)/gs
+    ) || [];
+
+    // Format each product block
+    // In your fetchRecommendedProducts function:
+const formattedResponse = recommendation
+  .replace(/\*\*Recommended Product:\*\* (.*?)\s+/g, '⭐ $1\n')
+  .replace(/\*\*Why It Works:\*\* (.*?)\s+/g, '🔍 Why It Works: $1\n')
+  .replace(/\*\*Application Advice:\*\* (.*?)(\n|$)/g, '💡 Application Advice: $1')
+  .trim();
+
+    setRecommendedProducts(prev => ({
+      ...prev,
+      [diseaseKey]: {
+        loading: false,
+        response: formattedResponse || 'No specific product recommendations found'
+      }
+    }));
+
+  } catch (error) {
+    console.error('Error fetching recommended products:', error);
+    setRecommendedProducts(prev => ({
+      ...prev,
+      [diseaseKey]: {
+        loading: false,
+        response: 'Failed to load recommendations. Please try again.'
+      }
+    }));
+  }
+};
 
   const renderTreatmentSection = (
     treatments: any,
@@ -334,8 +419,8 @@ export default function PlantHealthAnalyzer() {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <TouchableOpacity 
-              onPress={() => setIsSidebarVisible(true)} 
+            <TouchableOpacity
+              onPress={() => setIsSidebarVisible(true)}
               style={{ marginRight: 12 }}
             >
               <Text style={{ color: "#FFFFFF", fontSize: 24 }}>☰</Text>
@@ -354,64 +439,90 @@ export default function PlantHealthAnalyzer() {
           showsVerticalScrollIndicator={false}
         >
           {/* Upload Section */}
-          {!isViewingPreviousAnalysis &&(<View style={styles.uploadSection}>
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={pickFiles}
-              disabled={loading}
-            >
-              <Text style={styles.primaryButtonText}>📷 Pick Images</Text>
-            </TouchableOpacity>
+          {!isViewingPreviousAnalysis && (
+            <View style={styles.uploadSection}>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={pickFiles}
+                disabled={loading}
+              >
+                <Text style={styles.primaryButtonText}>📷 Pick Images</Text>
+              </TouchableOpacity>
 
-            {/* Image Grid */}
-            {images.length > 0 && (
-              <View style={styles.imageContainer}>
-                <Text style={styles.sectionTitle}>
-                  Selected Images ({images.length})
-                </Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.imageScrollView}
+              {/* Image Grid */}
+              {images.length > 0 && (
+                <View style={styles.imageContainer}>
+                  <Text style={styles.sectionTitle}>
+                    Selected Images ({images.length})
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.imageScrollView}
+                  >
+                    {images.map((img, idx) => (
+                      <View key={idx} style={styles.imageWrapper}>
+                        <Image
+                          source={{ uri: img.uri }}
+                          style={styles.imageThumb}
+                        />
+                        <TouchableOpacity
+                          style={styles.removeButton}
+                          onPress={() => removeImage(idx)}
+                        >
+                          <Text style={styles.removeButtonText}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Analyze Button */}
+              {images.length > 0 && (
+                <TouchableOpacity
+                  style={[
+                    styles.analyzeButton,
+                    loading && styles.disabledButton,
+                  ]}
+                  onPress={analyzeImages}
+                  disabled={loading}
                 >
-                  {images.map((img, idx) => (
+                  {loading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <Text style={styles.primaryButtonText}>Analyzing...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.primaryButtonText}>
+                      🔍 Analyze Plant Health
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {isViewingPreviousAnalysis && images.length > 0 && (
+            <View style={styles.imageContainer}>
+              <Text style={styles.sectionTitle}>Analysis Image</Text>
+              <View style={styles.imageScrollView}>
+                {images.map((img, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => setZoomedImage(img.uri)}
+                  >
                     <View key={idx} style={styles.imageWrapper}>
                       <Image
                         source={{ uri: img.uri }}
                         style={styles.imageThumb}
                       />
-                      <TouchableOpacity
-                        style={styles.removeButton}
-                        onPress={() => removeImage(idx)}
-                      >
-                        <Text style={styles.removeButtonText}>✕</Text>
-                      </TouchableOpacity>
                     </View>
-                  ))}
-                </ScrollView>
+                  </TouchableOpacity>
+                ))}
               </View>
-            )}
-
-            {/* Analyze Button */}
-            {images.length > 0 && (
-              <TouchableOpacity
-                style={[styles.analyzeButton, loading && styles.disabledButton]}
-                onPress={analyzeImages}
-                disabled={loading}
-              >
-                {loading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                    <Text style={styles.primaryButtonText}>Analyzing...</Text>
-                  </View>
-                ) : (
-                  <Text style={styles.primaryButtonText}>
-                    🔍 Analyze Plant Health
-                  </Text>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>)}
+            </View>
+          )}
 
           {/* Results Section */}
           {analysis && (
@@ -539,17 +650,50 @@ export default function PlantHealthAnalyzer() {
                             >
                               {disease.similar_images.map(
                                 (img: any, idx: number) => (
-                                  <Image
+                                  <TouchableOpacity
                                     key={idx}
-                                    source={{ uri: img.url_small }}
-                                    style={styles.similarImage}
-                                  />
+                                    onPress={() => setZoomedImage(img.url)}
+                                  >
+                                    <Image
+                                      key={idx}
+                                      source={{ uri: img.url_small }}
+                                      style={styles.similarImage}
+                                    />
+                                  </TouchableOpacity>
                                 )
                               )}
                             </ScrollView>
                           )}
                         </View>
                       )}
+                      {/* Recommendeded products*/}
+                     <View style={styles.dropdownSection}>
+  <TouchableOpacity
+    style={styles.dropdownHeader}
+    onPress={() => fetchRecommendedProducts(disease.name)}
+  >
+    <Text style={styles.dropdownTitle}>🛍️ Recommended Products</Text>
+    <Text style={styles.dropdownIcon}>
+      {recommendedProducts[`disease_${disease.name}`]?.response ? "▼" : "▶"}
+    </Text>
+  </TouchableOpacity>
+
+  {recommendedProducts[`disease_${disease.name}`]?.loading ? (
+    <View style={styles.loadingProducts}>
+      <ActivityIndicator size="small" color="#00D084" />
+      <Text style={styles.loadingProductsText}>Finding best products...</Text>
+    </View>
+  ) : recommendedProducts[`disease_${disease.name}`]?.response && (
+    <ScrollView 
+      style={styles.dropdownContent}
+      nestedScrollEnabled={true}
+    >
+      <Text style={styles.productText}>
+        {recommendedProducts[`disease_${disease.name}`].response}
+      </Text>
+    </ScrollView>
+  )}
+</View>
 
                       {/* Learn More Link */}
                       {disease.infoLink && (
@@ -600,6 +744,11 @@ export default function PlantHealthAnalyzer() {
           onLoadAnalysis={loadAnalysis}
           onDeleteAnalysis={deleteAnalysis}
           onStartNewAnalysis={startNewAnalysis}
+        />
+        <ImageZoomModal
+          visible={!!zoomedImage}
+          imageUrl={zoomedImage}
+          onClose={() => setZoomedImage(null)}
         />
       </SafeAreaView>
     </>
@@ -866,6 +1015,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: "#21262D",
+    maxHeight: 200, // Limit height and enable scrolling
   },
   treatmentSection: {
     marginBottom: 16,
@@ -990,5 +1140,38 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     textAlign: "center",
     lineHeight: 24,
+  },
+
+ loadingProducts: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: 16,
+  backgroundColor: '#0D1117',
+  borderRadius: 12,
+  marginTop: 8,
+  borderWidth: 1,
+  borderColor: '#21262D',
+},
+loadingProductsText: {
+  marginLeft: 12,
+  color: '#94A3B8',
+  fontSize: 14,
+},
+
+  productItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  productBullet: {
+    color: "#00D084",
+    fontSize: 16,
+    marginRight: 8,
+    marginTop: 2,
+  },
+  productText: {
+    fontSize: 14,
+    color: "#94A3B8",
+    lineHeight: 20,
   },
 });

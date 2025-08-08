@@ -17,6 +17,7 @@ const MAPPING = {
     'desktopcomputer': 'dashboard', // ✅ Dashboard screen
   'leaf.fill': 'eco',
   'square.and.arrow.up': 'upload', 
+  'lightbulb.fill': 'lightbulb',
 } as IconMapping;
 
 export function IconSymbol({

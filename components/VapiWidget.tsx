@@ -1,14 +1,15 @@
-import Vapi from '@vapi-ai/react-native';
-import React, { useEffect, useRef, useState } from 'react';
+import Vapi from "@vapi-ai/react-native";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  NativeModules,
   PermissionsAndroid,
   Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 
 interface VapiWidgetProps {
   apiKey: string;
@@ -30,11 +31,23 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
   // Request mic permission on mount
   useEffect(() => {
     const askPermission = async () => {
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+      if (Platform.OS === "android") {
+        const perms = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
+
+        // Only push FOREGROUND_SERVICE if the constant exists on this Android version
+        if (PermissionsAndroid.PERMISSIONS.FOREGROUND_SERVICE) {
+          perms.push(PermissionsAndroid.PERMISSIONS.FOREGROUND_SERVICE);
+        }
+
+        const granted = await PermissionsAndroid.requestMultiple(perms);
+
+        setMicGranted(
+          granted[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] ===
+            PermissionsAndroid.RESULTS.GRANTED &&
+            (!PermissionsAndroid.PERMISSIONS.FOREGROUND_SERVICE ||
+              granted[PermissionsAndroid.PERMISSIONS.FOREGROUND_SERVICE] ===
+                PermissionsAndroid.RESULTS.GRANTED)
         );
-        setMicGranted(granted === PermissionsAndroid.RESULTS.GRANTED);
       } else {
         setMicGranted(true);
       }
@@ -42,23 +55,23 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
     askPermission();
   }, []);
 
-  useEffect(() => {
-    const warmup = async () => {
-      try {
-        console.log('Warming up Vapi...');
-        await vapi.start(assistantId);
-        await vapi.stop();
-        console.log('Vapi warmup done ✅');
-      } catch (err) {
-        console.log('Warmup skipped:', err);
-      }
-    };
-    warmup();
-  }, [vapi, assistantId]);
+  // useEffect(() => {
+  //   const warmup = async () => {
+  //     try {
+  //       console.log('Warming up Vapi...');
+  //       await vapi.start(assistantId);
+  //       await vapi.stop();
+  //       console.log('Vapi warmup done ✅');
+  //     } catch (err) {
+  //       console.log('Warmup skipped:', err);
+  //     }
+  //   };
+  //   warmup();
+  // }, [vapi, assistantId]);
 
   // Vapi event listeners
   useEffect(() => {
-    vapi.on('call-start', () => {
+    vapi.on("call-start", () => {
       setIsConnecting(false);
       setIsConnected(true);
 
@@ -69,7 +82,7 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
       }, 1000);
     });
 
-    vapi.on('call-end', () => {
+    vapi.on("call-end", () => {
       setIsConnected(false);
       setIsSpeaking(false);
       setShowCallUI(false);
@@ -82,16 +95,16 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
       }
     });
 
-    vapi.on('call-start-failed', (err) => {
-      console.log('Call failed to start:', err);
+    vapi.on("call-start-failed", (err) => {
+      console.log("Call failed to start:", err);
       setIsConnecting(false);
     });
 
-    vapi.on('speech-start', () => setIsSpeaking(true));
-    vapi.on('speech-end', () => setIsSpeaking(false));
+    vapi.on("speech-start", () => setIsSpeaking(true));
+    vapi.on("speech-end", () => setIsSpeaking(false));
 
-    vapi.on('error', (error: any) => {
-      console.log('Vapi error:', error);
+    vapi.on("error", (error: any) => {
+      console.log("Vapi error:", error);
     });
 
     return () => {
@@ -102,7 +115,7 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
 
   const startCall = async () => {
     if (!micGranted) {
-      console.log('Microphone permission denied!');
+      console.log("Microphone permission denied!");
       return;
     }
 
@@ -112,7 +125,7 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
     // Retry if connection takes too long
     const timeout = setTimeout(() => {
       if (!isConnected) {
-        console.log('Retrying Vapi connection...');
+        console.log("Retrying Vapi connection...");
         vapi.stop();
         vapi.start(assistantId);
       }
@@ -122,6 +135,20 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
   };
 
   const endCall = () => {
+    // Stop foreground service if available
+    if (
+      Platform.OS === "android" &&
+      NativeModules.DailyOngoingMeetingForegroundService &&
+      typeof NativeModules.DailyOngoingMeetingForegroundService.stop ===
+        "function"
+    ) {
+      try {
+        NativeModules.DailyOngoingMeetingForegroundService.stop();
+      } catch (err) {
+        console.warn("Error stopping foreground service:", err);
+      }
+    }
+
     vapi.stop();
     setShowCallUI(false);
   };
@@ -130,8 +157,8 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
   const formatTime = (seconds: number) => {
     const min = Math.floor(seconds / 60)
       .toString()
-      .padStart(2, '0');
-    const sec = (seconds % 60).toString().padStart(2, '0');
+      .padStart(2, "0");
+    const sec = (seconds % 60).toString().padStart(2, "0");
     return `${min}:${sec}`;
   };
 
@@ -146,7 +173,9 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
           {isConnecting && (
             <>
               <ActivityIndicator size="large" color="#12A594" />
-              <Text style={styles.connectingText}>Connecting to Assistant...</Text>
+              <Text style={styles.connectingText}>
+                Connecting to Assistant...
+              </Text>
             </>
           )}
 
@@ -156,11 +185,11 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
                 <View
                   style={[
                     styles.statusDot,
-                    { backgroundColor: isSpeaking ? '#ff4444' : '#12A594' },
+                    { backgroundColor: isSpeaking ? "#ff4444" : "#12A594" },
                   ]}
                 />
                 <Text style={styles.statusText}>
-                  {isSpeaking ? 'Assistant Speaking...' : 'Connected'}
+                  {isSpeaking ? "Assistant Speaking..." : "Connected"}
                 </Text>
               </View>
               <Text style={styles.timerText}>{formatTime(callDuration)}</Text>
@@ -178,41 +207,41 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
 
 const styles = StyleSheet.create({
   wrapper: {
-    width: '100%',
-    alignItems: 'center',
+    width: "100%",
+    alignItems: "center",
     marginTop: 20,
   },
   startButton: {
-    backgroundColor: '#12A594',
+    backgroundColor: "#12A594",
     borderRadius: 50,
     paddingVertical: 16,
     paddingHorizontal: 30,
     elevation: 4,
   },
   startButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: "#fff",
+    fontWeight: "bold",
     fontSize: 16,
   },
   callBox: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
-    width: '80%',
+    width: "80%",
     padding: 20,
-    borderColor: '#e1e5e9',
+    borderColor: "#e1e5e9",
     borderWidth: 1,
-    alignItems: 'center',
+    alignItems: "center",
     elevation: 4,
   },
   connectingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#444',
-    textAlign: 'center',
+    color: "#444",
+    textAlign: "center",
   },
   statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
   },
   statusDot: {
@@ -222,26 +251,26 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   statusText: {
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
   },
   timerText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 12,
-    color: '#444',
+    color: "#444",
   },
   endButton: {
-    backgroundColor: '#ff4444',
+    backgroundColor: "#ff4444",
     borderRadius: 6,
     paddingVertical: 10,
     paddingHorizontal: 24,
     marginTop: 10,
   },
   endButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });
 

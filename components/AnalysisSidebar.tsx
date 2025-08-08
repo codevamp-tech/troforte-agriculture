@@ -1,5 +1,5 @@
 import React from "react";
-import { Animated, Dimensions, Platform, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Dimensions, Image, Platform, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 const { width: screenWidth } = Dimensions.get("window");
 const SIDEBAR_WIDTH = screenWidth * 0.75;
@@ -31,7 +31,6 @@ const AnalysisSidebar: React.FC<AnalysisSidebarProps> = ({
       duration: 300,
       useNativeDriver: true,
     }).start();
-    console.log("analysis", analysisHistory)
   }, [isVisible]);
 
   if (!isVisible) return null;
@@ -86,12 +85,22 @@ const AnalysisSidebar: React.FC<AnalysisSidebarProps> = ({
                 }}
                 onLongPress={() => onDeleteAnalysis(analysis.analysisId)}
               >
-                <Text style={styles.analysisHistoryTitleSidebar} numberOfLines={2}>
-                  {analysis.createdAt ? new Date(analysis.createdAt).toLocaleString() : "Unknown date"}
-                </Text>
-                <Text style={styles.analysisHistorySubtitleSidebar} numberOfLines={1}>
-                  {analysis.analysis.result.is_healthy ? "Healthy" : "Unhealthy"} - {analysis.analysis.result.disease.suggestions.length || 0} issues
-                </Text>
+                <View style={styles.analysisItemContent}>
+                  {analysis.imageUrl && (
+                    <Image
+                      source={{ uri: analysis.imageUrl }}
+                      style={styles.analysisThumbnail}
+                    />
+                  )}
+                  <View style={styles.analysisTextContainer}>
+                    <Text style={styles.analysisHistoryTitleSidebar} numberOfLines={2}>
+                      {analysis.createdAt ? new Date(analysis.createdAt).toLocaleString() : "Unknown date"}
+                    </Text>
+                    <Text style={styles.analysisHistorySubtitleSidebar} numberOfLines={1}>
+                      {analysis.analysis.result.is_healthy.binary ? "Healthy" : "Unhealthy"} - {analysis.analysis.result.disease.suggestions.length || 0} issues
+                    </Text>
+                  </View>
+                </View>
               </TouchableOpacity>
             ))
           )}
@@ -190,8 +199,7 @@ const styles = {
   },
   analysisHistoryItemSidebar: {
     backgroundColor: "#161B22",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    padding: 12,
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
@@ -209,17 +217,33 @@ const styles = {
     shadowRadius: 4,
     elevation: 4,
   },
+  analysisItemContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  analysisThumbnail: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: "#21262D",
+  },
+  analysisTextContainer: {
+    flex: 1,
+  },
   analysisHistoryTitleSidebar: {
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "600",
-    marginBottom: 6,
+    marginBottom: 4,
     fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
     lineHeight: 20,
   },
   analysisHistorySubtitleSidebar: {
-    color: "#ffffff",
+    color: "#E5E7EB",
     fontSize: 13,
+    opacity: 0.8,
     fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
   },
 };

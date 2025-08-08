@@ -28,7 +28,7 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="dashboard"
+        name="index"
         options={{
           title: "Dashboard",
           tabBarIcon: ({ color }) => (
@@ -37,11 +37,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="index"
+        name="plantHealth"
         options={{
-          title: "Upload",
+          title: "Health",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="square.and.arrow.up" color={color} />
+            <IconSymbol size={28} name="leaf.fill" color={color} />
           ),
         }}
       />
@@ -54,13 +54,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* <Tabs.Screen
-        name="rag"
-        options={{
-          title: 'Chat',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="filemenu.and.cursorarrow" color={color} />,
-          }}
-          /> */}
+     
       <Tabs.Screen
         name="voiceAssistant"
         options={{
@@ -70,12 +64,13 @@ export default function TabLayout() {
           ),
         }}
       />
+      
       <Tabs.Screen
-        name="plantHealth"
+        name="personalizedTips"
         options={{
-          title: "Health",
+          title: "Tips",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="leaf.fill" color={color} />
+            <IconSymbol size={28} name="lightbulb.fill" color={color} />
           ),
         }}
       />

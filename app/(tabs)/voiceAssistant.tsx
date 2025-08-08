@@ -1,5 +1,3 @@
-"use client"
-
 import VapiWidget from "@/components/VapiWidget"
 import { SafeAreaView, StatusBar, StyleSheet, Text, View } from "react-native"
 
