@@ -1,68 +1,81 @@
-import React, { useState } from "react"
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useEffect, useState } from "react";
 import {
-    Alert,
-    Platform,
-    // SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
-} from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
-
+  ActivityIndicator,
+  Alert,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface FarmerProfileScreenProps {
-  onBack: () => void
+  onBack: () => void;
+}
+
+interface FarmerData {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  dateOfBirth: string;
+  farmName: string;
+  farmAddress: string;
+  farmSize: string;
+  farmType: string;
+  establishedYear: string;
+  primaryCrops: string[];
+  farmingMethod: string;
+  certifications: string[];
+  emergencyContact: string;
+  emergencyPhone: string;
+  units: string;
+  notifications: {
+    weather: boolean;
+    pests: boolean;
+    market: boolean;
+    reminders: boolean;
+  };
 }
 
 export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [profileData, setProfileData] = useState({
-    // Personal Information
-    firstName: "John",
-    lastName: "Smith",
-    email: "john.smith@email.com",
-    phone: "+61 412 345 678",
-    dateOfBirth: "1985-03-15",
-    
-    // Farm Information
-    farmName: "Smith Family Farm",
-    farmAddress: "123 Rural Road, Wagga Wagga, NSW 2650",
-    farmSize: "250",
-    farmType: "mixed",
-    establishedYear: "1995",
-    
-    // Farming Details
-    primaryCrops: ["wheat", "barley", "canola"],
-    farmingMethod: "conventional",
-    certifications: ["Organic Certified", "Sustainable Agriculture"],
-    
-    // Contact & Emergency
-    emergencyContact: "Mary Smith",
-    emergencyPhone: "+61 412 345 679",
-    
-    // Preferences
+  const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [profileData, setProfileData] = useState<FarmerData>({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    dateOfBirth: "",
+    farmName: "",
+    farmAddress: "",
+    farmSize: "",
+    farmType: "",
+    establishedYear: "",
+    primaryCrops: [],
+    farmingMethod: "",
+    certifications: [],
+    emergencyContact: "",
+    emergencyPhone: "",
     units: "metric",
-    language: "english",
     notifications: {
       weather: true,
       pests: true,
       market: false,
       reminders: true,
-    }
-  })
-
-  const [tempData, setTempData] = useState(profileData)
+    },
+  });
+  const [tempData, setTempData] = useState(profileData);
 
   const farmTypes = [
     { id: "crop", name: "Crop Farming", icon: "🌾" },
     { id: "livestock", name: "Livestock", icon: "🐄" },
     { id: "mixed", name: "Mixed Farming", icon: "🚜" },
     { id: "organic", name: "Organic", icon: "🌱" },
-  ]
+  ];
 
   const availableCrops = [
     { id: "wheat", name: "Wheat", icon: "🌾" },
@@ -71,41 +84,155 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
     { id: "rice", name: "Rice", icon: "🌾" },
     { id: "canola", name: "Canola", icon: "🌻" },
     { id: "cotton", name: "Cotton", icon: "☁️" },
-  ]
+  ];
+
+  useEffect(() => {
+    const fetchFarmerData = async () => {
+      try {
+        setIsLoading(true);
+        
+        const farmerId = await AsyncStorage.getItem("farmerId");
+        if (!farmerId) {
+          throw new Error("Farmer ID not found");
+        }
+
+        const response = await fetch(
+          `http://192.168.29.228:4000/api/farmer/${farmerId}`
+        );
+        if (!response.ok) {
+          throw new Error("Failed to fetch farmer data");
+        }
+
+        const data = await response.json();
+
+        // Parse notifications - handle both string and object formats
+        let notifications = {
+          weather: true,
+          pests: true,
+          market: false,
+          reminders: true,
+        };
+        
+        if (typeof data.Notifications === 'string') {
+          try {
+            notifications = JSON.parse(data.Notifications);
+          } catch (e) {
+            console.warn('Failed to parse notifications', e);
+          }
+        } else if (data.Notifications) {
+          notifications = data.Notifications;
+        }
+
+        // Transform the API data
+        const transformedData: FarmerData = {
+          firstName: data.FirstName || "",
+          lastName: data.LastName || "",
+          phone: data.Phone || "",
+          dateOfBirth: data.DateOfBirth || "",
+          farmName: data.FarmName || "",
+          farmAddress: data.FarmAddress || "",
+          farmSize: data.FarmSize || "",
+          farmType: data.FarmType || "",
+          establishedYear: data.EstablishedYear || "",
+          primaryCrops: data.PrimaryCrops
+            ? data.PrimaryCrops.split(",").map((c: string) => c.trim())
+            : [],
+          farmingMethod: data.FarmingMethod || "",
+          certifications: data.Certifications
+            ? data.Certifications.split(",").map((c: string) => c.trim())
+            : [],
+          emergencyContact: data.EmergencyContact || "",
+          emergencyPhone: data.EmergencyPhone || "",
+          units: data.Units || "metric",
+          notifications: notifications,
+        };
+
+        setProfileData(transformedData);
+        setTempData(transformedData);
+      } catch (error) {
+        console.error("Error fetching farmer data:", error);
+        Alert.alert("Error", "Failed to load farmer profile");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFarmerData();
+  }, []);
 
   const handleInputChange = (field: string, value: string) => {
-    setTempData(prev => ({ ...prev, [field]: value }))
-  }
+    setTempData((prev) => ({ ...prev, [field]: value }));
+  };
 
   const handleCropToggle = (cropId: string) => {
-    setTempData(prev => ({
+    setTempData((prev) => ({
       ...prev,
       primaryCrops: prev.primaryCrops.includes(cropId)
-        ? prev.primaryCrops.filter(c => c !== cropId)
-        : [...prev.primaryCrops, cropId]
-    }))
-  }
+        ? prev.primaryCrops.filter((c) => c !== cropId)
+        : [...prev.primaryCrops, cropId],
+    }));
+  };
 
   const handleNotificationToggle = (type: string) => {
-    setTempData(prev => ({
+    setTempData((prev) => ({
       ...prev,
       notifications: {
         ...prev.notifications,
-        [type]: !prev.notifications[type]
-      }
-    }))
-  }
+        [type]: !prev.notifications[type as keyof typeof prev.notifications],
+      },
+    }));
+  };
 
-  const handleSave = () => {
-    setProfileData(tempData)
-    setIsEditing(false)
-    Alert.alert("Success", "Profile updated successfully!")
+ const handleSave = async () => {
+  try {
+    setIsLoading(true);
+    
+    const farmerId = await AsyncStorage.getItem("farmerId");
+    if (!farmerId) {
+      throw new Error("Farmer ID not found");
+    }
+
+    // Prepare the data for the API
+    const updateData = {
+      ...tempData,
+      primaryCrops: tempData.primaryCrops || [],
+      certifications: tempData.certifications || [],
+    };
+
+    const response = await fetch(
+      `http://192.168.29.228:4000/api/farmer/${farmerId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to update profile');
+    }
+
+    const data = await response.json();
+    
+    // Update local state
+    setProfileData(tempData);
+    setIsEditing(false);
+    
+    Alert.alert("Success", "Profile updated successfully!");
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    Alert.alert("Error", "Failed to update profile. Please try again.");
+  } finally {
+    setIsLoading(false);
   }
+};
 
   const handleCancel = () => {
-    setTempData(profileData)
-    setIsEditing(false)
-  }
+    setTempData(profileData);
+    setIsEditing(false);
+  };
 
   const renderViewMode = () => (
     <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -114,7 +241,8 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
-              {profileData.firstName.charAt(0)}{profileData.lastName.charAt(0)}
+              {profileData.firstName.charAt(0)}
+              {profileData.lastName.charAt(0)}
             </Text>
           </View>
           <TouchableOpacity style={styles.cameraButton}>
@@ -126,7 +254,9 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
             {profileData.firstName} {profileData.lastName}
           </Text>
           <Text style={styles.profileSubtitle}>{profileData.farmName}</Text>
-          <Text style={styles.profileLocation}>{profileData.farmAddress.split(',')[1]?.trim()}</Text>
+          <Text style={styles.profileLocation}>
+            {profileData.farmAddress?.split(",")[1]?.trim()}
+          </Text>
         </View>
       </View>
 
@@ -136,19 +266,20 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Full Name</Text>
-            <Text style={styles.infoValue}>{profileData.firstName} {profileData.lastName}</Text>
+            <Text style={styles.infoValue}>
+              {profileData.firstName} {profileData.lastName}
+            </Text>
           </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Email</Text>
-            <Text style={styles.infoValue}>{profileData.email}</Text>
-          </View>
+         
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Phone</Text>
             <Text style={styles.infoValue}>{profileData.phone}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Date of Birth</Text>
-            <Text style={styles.infoValue}>{new Date(profileData.dateOfBirth).toLocaleDateString()}</Text>
+            <Text style={styles.infoValue}>
+              {new Date(profileData.dateOfBirth).toLocaleDateString()}
+            </Text>
           </View>
         </View>
       </View>
@@ -167,12 +298,15 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Farm Size</Text>
-            <Text style={styles.infoValue}>{profileData.farmSize} hectares</Text>
+            <Text style={styles.infoValue}>
+              {profileData.farmSize} hectares
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Farm Type</Text>
             <Text style={styles.infoValue}>
-              {farmTypes.find(t => t.id === profileData.farmType)?.icon} {farmTypes.find(t => t.id === profileData.farmType)?.name}
+              {farmTypes.find((t) => t.id === profileData.farmType)?.icon}{" "}
+              {farmTypes.find((t) => t.id === profileData.farmType)?.name}
             </Text>
           </View>
           <View style={styles.infoRow}>
@@ -189,26 +323,30 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Primary Crops</Text>
             <View style={styles.cropsContainer}>
-              {profileData.primaryCrops.map(cropId => {
-                const crop = availableCrops.find(c => c.id === cropId)
+              {profileData.primaryCrops.map((cropId) => {
+                const crop = availableCrops.find((c) => c.id === cropId);
                 return (
                   <View key={cropId} style={styles.cropBadge}>
-                    <Text style={styles.cropBadgeText}>{crop?.icon} {crop?.name}</Text>
+                    <Text style={styles.cropBadgeText}>
+                      {crop?.icon} {crop?.name}
+                    </Text>
                   </View>
-                )
+                );
               })}
             </View>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Farming Method</Text>
             <Text style={styles.infoValue}>
-              {profileData.farmingMethod === 'organic' ? '🌱 Organic' : '🧪 Conventional'}
+              {profileData.farmingMethod === "organic"
+                ? "🌱 Organic"
+                : "🧪 Conventional"}
             </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Certifications</Text>
             <View style={styles.certificationsContainer}>
-              {profileData.certifications.map((cert, index) => (
+              {profileData.certifications?.map((cert, index) => (
                 <View key={index} style={styles.certificationBadge}>
                   <Text style={styles.certificationText}>🏆 {cert}</Text>
                 </View>
@@ -239,7 +377,9 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Units</Text>
-            <Text style={styles.infoValue}>{profileData.units === 'metric' ? '📏 Metric' : '📐 Imperial'}</Text>
+            <Text style={styles.infoValue}>
+              {profileData.units === "metric" ? "📏 Metric" : "📐 Imperial"}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Language</Text>
@@ -254,24 +394,34 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Weather Alerts</Text>
-            <Text style={styles.infoValue}>{profileData.notifications.weather ? '✅ Enabled' : '❌ Disabled'}</Text>
+            <Text style={styles.infoValue}>
+              {profileData.notifications.weather ? "✅ Enabled" : "❌ Disabled"}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Pest Warnings</Text>
-            <Text style={styles.infoValue}>{profileData.notifications.pests ? '✅ Enabled' : '❌ Disabled'}</Text>
+            <Text style={styles.infoValue}>
+              {profileData.notifications.pests ? "✅ Enabled" : "❌ Disabled"}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Market Updates</Text>
-            <Text style={styles.infoValue}>{profileData.notifications.market ? '✅ Enabled' : '❌ Disabled'}</Text>
+            <Text style={styles.infoValue}>
+              {profileData.notifications.market ? "✅ Enabled" : "❌ Disabled"}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Task Reminders</Text>
-            <Text style={styles.infoValue}>{profileData.notifications.reminders ? '✅ Enabled' : '❌ Disabled'}</Text>
+            <Text style={styles.infoValue}>
+              {profileData.notifications.reminders
+                ? "✅ Enabled"
+                : "❌ Disabled"}
+            </Text>
           </View>
         </View>
       </View>
     </ScrollView>
-  )
+  );
 
   const renderEditMode = () => (
     <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -285,7 +435,7 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
               <TextInput
                 style={styles.input}
                 value={tempData.firstName}
-                onChangeText={(value) => handleInputChange('firstName', value)}
+                onChangeText={(value) => handleInputChange("firstName", value)}
                 placeholder="First Name"
                 placeholderTextColor="#6B7280"
               />
@@ -295,31 +445,19 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
               <TextInput
                 style={styles.input}
                 value={tempData.lastName}
-                onChangeText={(value) => handleInputChange('lastName', value)}
+                onChangeText={(value) => handleInputChange("lastName", value)}
                 placeholder="Last Name"
                 placeholderTextColor="#6B7280"
               />
             </View>
           </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email</Text>
-            <TextInput
-              style={styles.input}
-              value={tempData.email}
-              onChangeText={(value) => handleInputChange('email', value)}
-              placeholder="Email"
-              placeholderTextColor="#6B7280"
-              keyboardType="email-address"
-            />
-          </View>
-          
+
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Phone</Text>
             <TextInput
               style={styles.input}
               value={tempData.phone}
-              onChangeText={(value) => handleInputChange('phone', value)}
+              onChangeText={(value) => handleInputChange("phone", value)}
               placeholder="Phone"
               placeholderTextColor="#6B7280"
               keyboardType="phone-pad"
@@ -337,32 +475,32 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
             <TextInput
               style={styles.input}
               value={tempData.farmName}
-              onChangeText={(value) => handleInputChange('farmName', value)}
+              onChangeText={(value) => handleInputChange("farmName", value)}
               placeholder="Farm Name"
               placeholderTextColor="#6B7280"
             />
           </View>
-          
+
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Farm Address</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={tempData.farmAddress}
-              onChangeText={(value) => handleInputChange('farmAddress', value)}
+              onChangeText={(value) => handleInputChange("farmAddress", value)}
               placeholder="Farm Address"
               placeholderTextColor="#6B7280"
               multiline
               numberOfLines={3}
             />
           </View>
-          
+
           <View style={styles.inputRow}>
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Farm Size (hectares)</Text>
               <TextInput
                 style={styles.input}
                 value={tempData.farmSize}
-                onChangeText={(value) => handleInputChange('farmSize', value)}
+                onChangeText={(value) => handleInputChange("farmSize", value)}
                 placeholder="250"
                 placeholderTextColor="#6B7280"
                 keyboardType="numeric"
@@ -373,7 +511,9 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
               <TextInput
                 style={styles.input}
                 value={tempData.establishedYear}
-                onChangeText={(value) => handleInputChange('establishedYear', value)}
+                onChangeText={(value) =>
+                  handleInputChange("establishedYear", value)
+                }
                 placeholder="1995"
                 placeholderTextColor="#6B7280"
                 keyboardType="numeric"
@@ -387,11 +527,20 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
               {farmTypes.map((type) => (
                 <TouchableOpacity
                   key={type.id}
-                  style={[styles.farmTypeOption, tempData.farmType === type.id && styles.selectedFarmType]}
-                  onPress={() => handleInputChange('farmType', type.id)}
+                  style={[
+                    styles.farmTypeOption,
+                    tempData.farmType === type.id && styles.selectedFarmType,
+                  ]}
+                  onPress={() => handleInputChange("farmType", type.id)}
                 >
                   <Text style={styles.farmTypeIcon}>{type.icon}</Text>
-                  <Text style={[styles.farmTypeText, tempData.farmType === type.id && styles.selectedFarmTypeText]}>
+                  <Text
+                    style={[
+                      styles.farmTypeText,
+                      tempData.farmType === type.id &&
+                        styles.selectedFarmTypeText,
+                    ]}
+                  >
                     {type.name}
                   </Text>
                 </TouchableOpacity>
@@ -409,11 +558,21 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
             {availableCrops.map((crop) => (
               <TouchableOpacity
                 key={crop.id}
-                style={[styles.cropSelector, tempData.primaryCrops.includes(crop.id) && styles.selectedCrop]}
+                style={[
+                  styles.cropSelector,
+                  tempData.primaryCrops.includes(crop.id) &&
+                    styles.selectedCrop,
+                ]}
                 onPress={() => handleCropToggle(crop.id)}
               >
                 <Text style={styles.cropIcon}>{crop.icon}</Text>
-                <Text style={[styles.cropText, tempData.primaryCrops.includes(crop.id) && styles.selectedCropText]}>
+                <Text
+                  style={[
+                    styles.cropText,
+                    tempData.primaryCrops.includes(crop.id) &&
+                      styles.selectedCropText,
+                  ]}
+                >
                   {crop.name}
                 </Text>
               </TouchableOpacity>
@@ -431,18 +590,22 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
             <TextInput
               style={styles.input}
               value={tempData.emergencyContact}
-              onChangeText={(value) => handleInputChange('emergencyContact', value)}
+              onChangeText={(value) =>
+                handleInputChange("emergencyContact", value)
+              }
               placeholder="Emergency Contact Name"
               placeholderTextColor="#6B7280"
             />
           </View>
-          
+
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Phone Number</Text>
             <TextInput
               style={styles.input}
               value={tempData.emergencyPhone}
-              onChangeText={(value) => handleInputChange('emergencyPhone', value)}
+              onChangeText={(value) =>
+                handleInputChange("emergencyPhone", value)
+              }
               placeholder="Emergency Phone"
               placeholderTextColor="#6B7280"
               keyboardType="phone-pad"
@@ -458,23 +621,41 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
           {Object.entries(tempData.notifications).map(([key, value]) => (
             <View key={key} style={styles.notificationRow}>
               <Text style={styles.notificationLabel}>
-                {key === 'weather' && '🌦️ Weather Alerts'}
-                {key === 'pests' && '🐛 Pest Warnings'}
-                {key === 'market' && '📈 Market Updates'}
-                {key === 'reminders' && '⏰ Task Reminders'}
+                {key === "weather" && "🌦️ Weather Alerts"}
+                {key === "pests" && "🐛 Pest Warnings"}
+                {key === "market" && "📈 Market Updates"}
+                {key === "reminders" && "⏰ Task Reminders"}
               </Text>
               <TouchableOpacity
-                style={[styles.toggleSwitch, value && styles.toggleSwitchActive]}
+                style={[
+                  styles.toggleSwitch,
+                  value && styles.toggleSwitchActive,
+                ]}
                 onPress={() => handleNotificationToggle(key)}
               >
-                <View style={[styles.toggleThumb, value && styles.toggleThumbActive]} />
+                <View
+                  style={[
+                    styles.toggleThumb,
+                    value && styles.toggleThumbActive,
+                  ]}
+                />
               </TouchableOpacity>
             </View>
           ))}
         </View>
       </View>
     </ScrollView>
-  )
+  );
+
+  
+     if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#00D084" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -487,13 +668,17 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Farmer Profile</Text>
-          <Text style={styles.headerSubtitle}>Manage your profile and farm information</Text>
+          <Text style={styles.headerSubtitle}>
+            Manage your profile and farm information
+          </Text>
         </View>
         <TouchableOpacity
           style={styles.editButton}
-          onPress={() => isEditing ? handleSave() : setIsEditing(true)}
+          onPress={() => (isEditing ? handleSave() : setIsEditing(true))}
         >
-          <Text style={styles.editButtonText}>{isEditing ? '💾 Save' : '✏️ Edit'}</Text>
+          <Text style={styles.editButtonText}>
+            {isEditing ? "💾 Save" : "✏️ Edit"}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -510,10 +695,21 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
 
       {isEditing ? renderEditMode() : renderViewMode()}
     </SafeAreaView>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
+   loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#010409',
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    marginTop: 16,
+    fontSize: 16,
+  },
   container: {
     flex: 1,
     backgroundColor: "#010409",
@@ -866,4 +1062,4 @@ const styles = StyleSheet.create({
   toggleThumbActive: {
     alignSelf: "flex-end",
   },
-})
+});

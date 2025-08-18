@@ -4,8 +4,10 @@ import CropCalendarScreen from "@/components/screens/CropCalendarScreen";
 import FarmerProfileScreen from "@/components/screens/FarmerProfileScreen";
 import SoilHealthScreen from "@/components/screens/SoilHealthScreen";
 import YieldPredictionScreen from "@/components/screens/YieldPredictionScreen";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Location from "expo-location";
+import { router } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -81,7 +83,7 @@ export default function Dashboard() {
       const fetchNewsData = async () => {
         try {
           const newsRes = await fetch(
-            "http://192.168.1.17:4000/api/news/agriculture"
+            "http://192.168.29.228:4000/api/news/agriculture"
           );
           const newsData = await newsRes.json();
           if (isActive && newsData?.success) {
@@ -104,6 +106,16 @@ export default function Dashboard() {
       };
     }, [])
   );
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem("userId");
+      router.replace("/(auth)/login");
+      console.log("Logged out successfully");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   const handleNewsPress = (url: string) => {
     Linking.openURL(url).catch((err) =>
@@ -160,9 +172,20 @@ export default function Dashboard() {
       <StatusBar barStyle="light-content" backgroundColor="#010409" />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Header */}
+        {/* Header */}
         <View style={styles.headerContainer}>
-          <Text style={styles.welcomeText}>Good day! 👋</Text>
-          <Text style={styles.dashboardTitle}>Your Dashboard</Text>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.welcomeText}>Good day! 👋</Text>
+              <Text style={styles.dashboardTitle}>Your Dashboard</Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleLogout}
+              style={styles.logoutButton}
+            >
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Weather Section */}
@@ -731,5 +754,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#94A3B8", // Lighter gray for secondary text
     fontWeight: "500",
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  logoutButton: {
+    backgroundColor: "#161B22",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#30363D",
+  },
+  logoutText: {
+    color: "#F85149",
+    fontWeight: "600",
+    fontSize: 14,
   },
 });
