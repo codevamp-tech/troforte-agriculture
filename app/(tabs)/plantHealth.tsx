@@ -48,7 +48,7 @@ interface RecommendedProducts {
   };
 }
 
-const API_BASE_URL = "http://192.168.1.17:4000/api";
+const API_BASE_URL = "http://192.168.29.228:4000/api";
 
 export default function PlantHealthAnalyzer() {
   const [images, setImages] = useState<any[]>([]);
@@ -273,7 +273,7 @@ export default function PlantHealthAnalyzer() {
     try {
       setLoading(true);
       const response = await fetch(
-        "http://192.168.1.17:4000/api/plant-health/analyze",
+        "http://192.168.29.228:4000/api/plant-health/analyze",
         {
           method: "POST",
           body: formData,
@@ -332,64 +332,71 @@ export default function PlantHealthAnalyzer() {
   };
 
   const fetchRecommendedProducts = async (diseaseName: string) => {
-  const diseaseKey = `disease_${diseaseName}`;
-  
-  setRecommendedProducts(prev => ({
-    ...prev,
-    [diseaseKey]: {
-      loading: true,
-      response: null
-    }
-  }));
+    const diseaseKey = `disease_${diseaseName}`;
 
-  try {
-    const response = await fetch('http://192.168.1.17:4000/api/chat?recommend=true', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    setRecommendedProducts((prev) => ({
+      ...prev,
+      [diseaseKey]: {
+        loading: true,
+        response: null,
       },
-      body: JSON.stringify({
-        query: `my plant has ${diseaseName}. recommend me products`
-      })
-    });
-
-    const textData = await response.text();
-    const jsonData = JSON.parse(textData);
-    const recommendation = jsonData.recommendation || textData;
-    console.log("recommendation", recommendation)
-
-    // Extract product blocks
-    const productBlocks = recommendation.match(
-      /- \*\*Recommended Product:\*\* (.*?)\s+- \*\*Why It Works:\*\* (.*?)\s+- \*\*Application Advice:\*\* (.*?)(?=\n\n###|\n\n$)/gs
-    ) || [];
-
-    // Format each product block
-    // In your fetchRecommendedProducts function:
-const formattedResponse = recommendation
-  .replace(/\*\*Recommended Product:\*\* (.*?)\s+/g, '⭐ $1\n')
-  .replace(/\*\*Why It Works:\*\* (.*?)\s+/g, '🔍 Why It Works: $1\n')
-  .replace(/\*\*Application Advice:\*\* (.*?)(\n|$)/g, '💡 Application Advice: $1')
-  .trim();
-
-    setRecommendedProducts(prev => ({
-      ...prev,
-      [diseaseKey]: {
-        loading: false,
-        response: formattedResponse || 'No specific product recommendations found'
-      }
     }));
 
-  } catch (error) {
-    console.error('Error fetching recommended products:', error);
-    setRecommendedProducts(prev => ({
-      ...prev,
-      [diseaseKey]: {
-        loading: false,
-        response: 'Failed to load recommendations. Please try again.'
-      }
-    }));
-  }
-};
+    try {
+      const response = await fetch(
+        "http://192.168.29.228:4000/api/chat?recommend=true",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            query: `my plant has ${diseaseName}. recommend me products`,
+          }),
+        }
+      );
+
+      const textData = await response.text();
+      const jsonData = JSON.parse(textData);
+      const recommendation = jsonData.recommendation || textData;
+      console.log("recommendation", recommendation);
+
+      // Extract product blocks
+      const productBlocks =
+        recommendation.match(
+          /- \*\*Recommended Product:\*\* (.*?)\s+- \*\*Why It Works:\*\* (.*?)\s+- \*\*Application Advice:\*\* (.*?)(?=\n\n###|\n\n$)/gs
+        ) || [];
+
+      // Format each product block
+      // In your fetchRecommendedProducts function:
+      const formattedResponse = recommendation
+        .replace(/\*\*Recommended Product:\*\* (.*?)\s+/g, "⭐ $1\n")
+        .replace(/\*\*Why It Works:\*\* (.*?)\s+/g, "🔍 Why It Works: $1\n")
+        .replace(
+          /\*\*Application Advice:\*\* (.*?)(\n|$)/g,
+          "💡 Application Advice: $1"
+        )
+        .trim();
+
+      setRecommendedProducts((prev) => ({
+        ...prev,
+        [diseaseKey]: {
+          loading: false,
+          response:
+            formattedResponse || "No specific product recommendations found",
+        },
+      }));
+    } catch (error) {
+      console.error("Error fetching recommended products:", error);
+      setRecommendedProducts((prev) => ({
+        ...prev,
+        [diseaseKey]: {
+          loading: false,
+          response: "Failed to load recommendations. Please try again.",
+        },
+      }));
+    }
+  };
 
   const renderTreatmentSection = (
     treatments: any,
@@ -416,7 +423,7 @@ const formattedResponse = recommendation
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#010409" />
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.header}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <TouchableOpacity
@@ -604,7 +611,10 @@ const formattedResponse = recommendation
                           </TouchableOpacity>
 
                           {expandedTreatments[`treatments_${i}`] && (
-                            <View style={styles.dropdownContent}>
+                            <ScrollView
+                              style={styles.dropdownContent}
+                              nestedScrollEnabled={true}
+                            >
                               {renderTreatmentSection(
                                 disease.treatments,
                                 "chemical",
@@ -620,7 +630,7 @@ const formattedResponse = recommendation
                                 "prevention",
                                 i
                               )}
-                            </View>
+                            </ScrollView>
                           )}
                         </View>
                       )}
@@ -667,33 +677,47 @@ const formattedResponse = recommendation
                         </View>
                       )}
                       {/* Recommendeded products*/}
-                     <View style={styles.dropdownSection}>
-  <TouchableOpacity
-    style={styles.dropdownHeader}
-    onPress={() => fetchRecommendedProducts(disease.name)}
-  >
-    <Text style={styles.dropdownTitle}>🛍️ Recommended Products</Text>
-    <Text style={styles.dropdownIcon}>
-      {recommendedProducts[`disease_${disease.name}`]?.response ? "▼" : "▶"}
-    </Text>
-  </TouchableOpacity>
+                      <View style={styles.dropdownSection}>
+                        <TouchableOpacity
+                          style={styles.dropdownHeader}
+                          onPress={() => fetchRecommendedProducts(disease.name)}
+                        >
+                          <Text style={styles.dropdownTitle}>
+                            🛍️ Recommended Products
+                          </Text>
+                          <Text style={styles.dropdownIcon}>
+                            {recommendedProducts[`disease_${disease.name}`]
+                              ?.response
+                              ? "▼"
+                              : "▶"}
+                          </Text>
+                        </TouchableOpacity>
 
-  {recommendedProducts[`disease_${disease.name}`]?.loading ? (
-    <View style={styles.loadingProducts}>
-      <ActivityIndicator size="small" color="#00D084" />
-      <Text style={styles.loadingProductsText}>Finding best products...</Text>
-    </View>
-  ) : recommendedProducts[`disease_${disease.name}`]?.response && (
-    <ScrollView 
-      style={styles.dropdownContent}
-      nestedScrollEnabled={true}
-    >
-      <Text style={styles.productText}>
-        {recommendedProducts[`disease_${disease.name}`].response}
-      </Text>
-    </ScrollView>
-  )}
-</View>
+                        {recommendedProducts[`disease_${disease.name}`]
+                          ?.loading ? (
+                          <View style={styles.loadingProducts}>
+                            <ActivityIndicator size="small" color="#00D084" />
+                            <Text style={styles.loadingProductsText}>
+                              Finding best products...
+                            </Text>
+                          </View>
+                        ) : (
+                          recommendedProducts[`disease_${disease.name}`]
+                            ?.response && (
+                            <ScrollView
+                              style={styles.dropdownContent}
+                              nestedScrollEnabled={true}
+                            >
+                              <Text style={styles.productText}>
+                                {
+                                  recommendedProducts[`disease_${disease.name}`]
+                                    .response
+                                }
+                              </Text>
+                            </ScrollView>
+                          )
+                        )}
+                      </View>
 
                       {/* Learn More Link */}
                       {disease.infoLink && (
@@ -1142,21 +1166,21 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
- loadingProducts: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  padding: 16,
-  backgroundColor: '#0D1117',
-  borderRadius: 12,
-  marginTop: 8,
-  borderWidth: 1,
-  borderColor: '#21262D',
-},
-loadingProductsText: {
-  marginLeft: 12,
-  color: '#94A3B8',
-  fontSize: 14,
-},
+  loadingProducts: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#0D1117",
+    borderRadius: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#21262D",
+  },
+  loadingProductsText: {
+    marginLeft: 12,
+    color: "#94A3B8",
+    fontSize: 14,
+  },
 
   productItem: {
     flexDirection: "row",

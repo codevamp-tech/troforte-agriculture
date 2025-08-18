@@ -24,9 +24,28 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [micGranted, setMicGranted] = useState(false);
 
-  // Timer
   const [callDuration, setCallDuration] = useState(0);
-  const timerRef = useRef<NodeJS.Timer | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null); // New ref for retry timeout
+
+  // Timer effect
+  useEffect(() => {
+    if (isConnected) {
+      timerRef.current = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setCallDuration(0);
+    }
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isConnected]); 
 
   // Request mic permission on mount
   useEffect(() => {
@@ -55,31 +74,11 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
     askPermission();
   }, []);
 
-  // useEffect(() => {
-  //   const warmup = async () => {
-  //     try {
-  //       console.log('Warming up Vapi...');
-  //       await vapi.start(assistantId);
-  //       await vapi.stop();
-  //       console.log('Vapi warmup done ✅');
-  //     } catch (err) {
-  //       console.log('Warmup skipped:', err);
-  //     }
-  //   };
-  //   warmup();
-  // }, [vapi, assistantId]);
-
   // Vapi event listeners
   useEffect(() => {
     vapi.on("call-start", () => {
       setIsConnecting(false);
       setIsConnected(true);
-
-      // Start call timer
-      setCallDuration(0);
-      timerRef.current = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-      }, 1000);
     });
 
     vapi.on("call-end", () => {
@@ -88,16 +87,28 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
       setShowCallUI(false);
       setIsConnecting(false);
 
-      // Stop timer
+      // Clear timer
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
+      }
+      
+      // Clear retry timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
     });
 
     vapi.on("call-start-failed", (err) => {
       console.log("Call failed to start:", err);
       setIsConnecting(false);
+      
+      // Clear retry timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     });
 
     vapi.on("speech-start", () => setIsSpeaking(true));
@@ -110,6 +121,7 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
     return () => {
       vapi.stop();
       if (timerRef.current) clearInterval(timerRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current); // Cleanup retry timeout
     };
   }, [vapi]);
 
@@ -122,25 +134,49 @@ const VapiWidget: React.FC<VapiWidgetProps> = ({ apiKey, assistantId }) => {
     setShowCallUI(true);
     setIsConnecting(true);
 
-    // Retry if connection takes too long
-    const timeout = setTimeout(() => {
-      if (!isConnected) {
+    // Clear any existing retry timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    // Setup retry timeout
+    timeoutRef.current = setTimeout(() => {
+      // Only retry if still connecting
+      if (isConnecting) {
         console.log("Retrying Vapi connection...");
-        vapi.stop();
-        vapi.start(assistantId);
+        vapi.start(assistantId).catch(err => {
+          console.log("Retry failed:", err);
+          setIsConnecting(false);
+        });
       }
     }, 8000);
 
-    vapi.start(assistantId).finally(() => clearTimeout(timeout));
+    // Start initial call attempt
+    vapi.start(assistantId).catch(err => {
+      console.log("Initial call failed:", err);
+      setIsConnecting(false);
+      
+      // Clear retry timeout on immediate failure
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    });
   };
 
   const endCall = () => {
+    // Clear retry timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
     // Stop foreground service if available
     if (
       Platform.OS === "android" &&
       NativeModules.DailyOngoingMeetingForegroundService &&
-      typeof NativeModules.DailyOngoingMeetingForegroundService.stop ===
-        "function"
+      typeof NativeModules.DailyOngoingMeetingForegroundService.stop === "function"
     ) {
       try {
         NativeModules.DailyOngoingMeetingForegroundService.stop();
