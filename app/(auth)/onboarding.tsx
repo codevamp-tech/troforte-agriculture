@@ -7,15 +7,15 @@ import { Picker } from "@react-native-picker/picker"
 import { useRouter } from "expo-router"
 import { useState } from "react"
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native"
 
 export default function OnboardingScreen() {
@@ -164,7 +164,7 @@ export default function OnboardingScreen() {
     };
 
     // Send to backend API
-    const response = await fetch("http://192.168.29.228:4000/api/register-farmer", {
+    const response = await fetch("http://192.168.1.23:4000/api/register-farmer", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

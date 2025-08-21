@@ -48,7 +48,7 @@ interface RecommendedProducts {
   };
 }
 
-const API_BASE_URL = "http://192.168.29.228:4000/api";
+const API_BASE_URL = "http://192.168.1.23:4000/api";
 
 export default function PlantHealthAnalyzer() {
   const [images, setImages] = useState<any[]>([]);
@@ -273,7 +273,7 @@ export default function PlantHealthAnalyzer() {
     try {
       setLoading(true);
       const response = await fetch(
-        "http://192.168.29.228:4000/api/plant-health/analyze",
+        "http://192.168.1.23:4000/api/plant-health/analyze",
         {
           method: "POST",
           body: formData,
@@ -344,7 +344,7 @@ export default function PlantHealthAnalyzer() {
 
     try {
       const response = await fetch(
-        "http://192.168.29.228:4000/api/chat?recommend=true",
+        "http://192.168.1.23:4000/api/chat?recommend=true",
         {
           method: "POST",
           headers: {
