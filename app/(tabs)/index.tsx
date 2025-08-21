@@ -83,7 +83,7 @@ export default function Dashboard() {
       const fetchNewsData = async () => {
         try {
           const newsRes = await fetch(
-            "http://192.168.29.228:4000/api/news/agriculture"
+            "http://192.168.1.23:4000/api/news/agriculture"
           );
           const newsData = await newsRes.json();
           if (isActive && newsData?.success) {

@@ -7,7 +7,7 @@ export default function VoiceAssistantScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#1A202C" />
       <View style={styles.container}>
         <Text style={styles.title}>AgriBot Voice Assistant</Text>
-        <VapiWidget apiKey="dedd80d6-9753-4280-8691-9cf56ac2cb4a" assistantId="2fb5b2a4-7dcf-4682-a4eb-f5c362e407f6" />
+        <VapiWidget />
       </View>
     </SafeAreaView>
   )

@@ -1,4 +1,3 @@
-
 import Vapi from "@vapi-ai/react-native";
 import { useEffect, useState } from "react";
 import { PermissionsAndroid, Platform } from "react-native";
@@ -8,6 +7,7 @@ export enum CALL_STATUS {
   CONNECTING = "CONNECTING",
   ACTIVE = "ACTIVE",
   FINISHED = "FINISHED",
+  ERROR = "ERROR",
 }
 
 // 🔑 Hardcoded keys
@@ -20,14 +20,13 @@ export function useVapi() {
   const [callStatus, setCallStatus] = useState<CALL_STATUS>(CALL_STATUS.INACTIVE);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [micGranted, setMicGranted] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // 🎤 Ask mic permissions on mount
   useEffect(() => {
     const askPermission = async () => {
       if (Platform.OS === "android") {
         const perms = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
-
-        // Some Android versions need foreground service for long calls
         if (PermissionsAndroid.PERMISSIONS.FOREGROUND_SERVICE) {
           perms.push(PermissionsAndroid.PERMISSIONS.FOREGROUND_SERVICE);
         }
@@ -51,9 +50,18 @@ export function useVapi() {
 
   // 🔔 Event listeners
   useEffect(() => {
-    vapi.on("call-start", () => setCallStatus(CALL_STATUS.ACTIVE));
+    vapi.on("call-start", () => {
+      setErrorMsg(null);
+      setCallStatus(CALL_STATUS.ACTIVE);
+    });
+
     vapi.on("call-end", () => setCallStatus(CALL_STATUS.FINISHED));
-    vapi.on("error", () => setCallStatus(CALL_STATUS.INACTIVE));
+
+    vapi.on("error", () => {
+      setErrorMsg("Free trial ended, try again tomorrow");
+      setCallStatus(CALL_STATUS.ERROR);
+    });
+
     vapi.on("speech-start", () => setIsSpeaking(true));
     vapi.on("speech-end", () => setIsSpeaking(false));
 
@@ -70,12 +78,14 @@ export function useVapi() {
     }
 
     setCallStatus(CALL_STATUS.CONNECTING);
+    setErrorMsg(null);
 
     try {
       await vapi.start(assistantId);
     } catch (err) {
       console.error("Failed to start call:", err);
-      setCallStatus(CALL_STATUS.INACTIVE);
+      setErrorMsg("Free trial ended, try again tomorrow");
+      setCallStatus(CALL_STATUS.ERROR);
     }
   };
 
@@ -99,5 +109,6 @@ export function useVapi() {
     isMuted,
     isSpeaking,
     micGranted,
+    errorMsg, // 👈 always the same message on any error
   };
 }

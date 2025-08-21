@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "agricultureapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.ReactNativeWithExpo52",
@@ -16,7 +16,8 @@
         "NSMicrophoneUsageDescription": "Vapi Playground needs microphone access to work",
         "NSLocationWhenInUseUsageDescription": "We need your location to show weather data in your region.",
         "UIBackgroundModes": ["voip"]
-      }
+      },
+      "bitcode": false
     },
     "android": {
       "package": "com.anonymous.ReactNativeWithExpo52",
