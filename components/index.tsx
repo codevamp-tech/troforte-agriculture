@@ -40,7 +40,7 @@ export default function HomeScreen() {
           type: file.mimeType || "application/octet-stream",
         } as any)
 
-        const res = await fetch("http://192.168.1.23:4000/api/upload", {
+        const res = await fetch("http://192.168.1.17:4000/api/upload", {
           method: "POST",
           headers: {
             "Content-Type": "multipart/form-data",
