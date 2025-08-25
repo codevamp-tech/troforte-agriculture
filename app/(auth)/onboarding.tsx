@@ -164,7 +164,7 @@ export default function OnboardingScreen() {
     };
 
     // Send to backend API
-    const response = await fetch("http://192.168.1.23:4000/api/register-farmer", {
+    const response = await fetch("http://192.168.1.17:4000/api/register-farmer", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

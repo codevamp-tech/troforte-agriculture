@@ -97,7 +97,7 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
         }
 
         const response = await fetch(
-          `http://192.168.1.23:4000/api/farmer/${farmerId}`
+          `http://192.168.1.17:4000/api/farmer/${farmerId}`
         );
         if (!response.ok) {
           throw new Error("Failed to fetch farmer data");
@@ -200,7 +200,7 @@ export default function FarmerProfileScreen({ onBack }: FarmerProfileScreenProps
     };
 
     const response = await fetch(
-      `http://192.168.1.23:4000/api/farmer/${farmerId}`,
+      `http://192.168.1.17:4000/api/farmer/${farmerId}`,
       {
         method: 'PUT',
         headers: {

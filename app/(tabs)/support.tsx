@@ -17,7 +17,7 @@ import Markdown from "react-native-markdown-display"
 import { SafeAreaView } from "react-native-safe-area-context"
 import uuid from "react-native-uuid"
 
-const API_BASE_URL = "http://192.168.1.23:4000/api" 
+const API_BASE_URL = "http://192.168.1.17:4000/api" 
 
 export default function SupportScreen() {
   const [messages, setMessages] = useState<{ role: string; content: string; timestamp?: string }[]>([])
